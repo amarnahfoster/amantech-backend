@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AmanTech Shop</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: linear-gradient(135deg, #f0f8ff, #ffe6f0, #ffffff); color: #000; }
+    nav { background-color: #054A91; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+    nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+    .dropdown { position: relative; display: inline-block; }
+    .dropdown-content { display: none; position: absolute; background-color: #0E6BA8; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1; }
+    .dropdown-content a { color: white; padding: 12px 16px; text-decoration: none; display: block; }
+    .dropdown:hover .dropdown-content { display: block; }
+    .container { padding: 20px; }
+    .section { background: #e6f0ff; margin: 15px 0; padding: 20px; border-radius: 10px; border: 1px solid #ccc; }
+    button { padding: 10px; background-color: #054A91; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    select, input { padding: 10px; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px; }
+    .greeting { font-weight: bold; font-size: 1.2em; }
+    .datetime { margin-top: 10px; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <!-- Your existing HTML layout stays intact -->
+
+  <script>
+    let currentUser = null;
+    let selectedProduct = null;
+
+    function updateGreeting() {
+      const hour = new Date().getHours();
+      const user = currentUser?.username || 'User';
+      const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+      document.getElementById('greeting').innerText = `${greeting}, ${user}`;
+      document.getElementById('datetime').innerText = new Date().toLocaleString();
+    }
+
+    async function loadProducts() {
+      const res = await fetch('http://localhost:3000/api/products');
+      const products = await res.json();
+      const grouped = { MTN: [], Telecel: [], AirtelTigo: [] };
+      products.forEach(p => grouped[p.network]?.push(p));
+      populateSelect('mtn-packages', grouped.MTN);
+      populateSelect('telecel-packages', grouped.Telecel);
+      populateSelect('airteltigo-packages', grouped.AirtelTigo);
+    }
+
+    function populateSelect(id, list) {
+      const select = document.getElementById(id);
+      select.innerHTML = '';
+      list.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = JSON.stringify(item);
+        opt.textContent = `${item.plan} - GH₵${item.price}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function buy(network) {
+      const dropdown = document.getElementById(`${network}-packages`);
+      selectedProduct = JSON.parse(dropdown.value);
+      selectedProduct.network = network;
+      document.getElementById("selectedPackage").innerText = `You selected: ${selectedProduct.plan} on ${network} for GH₵${selectedProduct.price}`;
+      document.getElementById("confirmation").style.display = "block";
+    }
+
+    async function confirmPurchase() {
+      if (!selectedProduct || !currentUser) return alert("Please login and select a product");
+      const response = await fetch("http://localhost:3000/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...selectedProduct, username: currentUser.username })
+      });
+      const result = await response.json();
+      alert(result.message);
+      document.getElementById("confirmation").style.display = "none";
+    }
+
+    function cancelPurchase() {
+      document.getElementById("confirmation").style.display = "none";
+    }
+
+    function topUpWallet() {
+      const amount = parseFloat(document.getElementById('topupAmount').value);
+      const email = `${currentUser.username}@gmail.com`;
+      fetch("http://localhost:3000/api/wallet/topup", {
+        method: "POST",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, amount, username: currentUser.username })
+      })
+      .then(res => res.json())
+      .then(data => window.location.href = data.url)
+      .catch(err => alert('Error starting payment'));
+    }
+
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('signupUsername').value;
+      const password = document.getElementById('signupPassword').value;
+      const res = await fetch('http://localhost:3000/api/auth/signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      alert(data.message);
+    });
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      const res = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.token) {
+        currentUser = { username, wallet: data.user.wallet };
+        alert("Welcome " + username);
+        document.getElementById('walletBalance').innerText = `Wallet Balance: GH₵${data.user.wallet}`;
+        updateGreeting();
+      } else {
+        alert(data.message);
+      }
+    });
+
+    window.onload = () => {
+      updateGreeting();
+      loadProducts();
+    };
+  </script>
+</body>
+</html>
