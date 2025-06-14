@@ -1,33 +1,40 @@
 const express = require('express');
-const { MongoClient } = require('mongodb');
 const cors = require('cors');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const bodyParser = require('body-parser');
+
+dotenv.config();
 
 const app = express();
-const port = 3000;
+const PORT = process.env.PORT || 5000;
 
-app.use(express.json());
+// Middleware
 app.use(cors());
+app.use(bodyParser.json());
 
-const uri = 'mongodb://localhost:27017';
-const client = new MongoClient(uri);
-const dbName = 'AmanTech_shop';
+// Mount routes
+const userRoutes = require('./routes/userRoutes');
+const productRoutes = require('./routes/productRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 
-app.get('/api/products', async (req, res) => {
-  try {
-    await client.connect();
-    const db = client.db(dbName);
-    const collection = db.collection('Products');
+app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/orders', orderRoutes);
 
-    const network = req.query.network;
-    const filter = network ? { network } : {};
-    
-    const products = await collection.find(filter).toArray();
-    res.json(products);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
+// Test route
+app.get('/', (req, res) => {
+  res.send('AmanTech Backend is running...');
 });
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log('✅ MongoDB connected'))
+.catch(err => console.error('❌ MongoDB connection error:', err));
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
